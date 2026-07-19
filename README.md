@@ -9,7 +9,7 @@ lifecycle rule.
 
 ```hcl
 module "bucket" {
-  source = "github.com/cybercapybara/terraform-google-storage-bucket"
+  source = "github.com/moveeeax/terraform-google-storage-bucket"
 
   project_id         = var.project_id
   name               = "my-app-assets"
