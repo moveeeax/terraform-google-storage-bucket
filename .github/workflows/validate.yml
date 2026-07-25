@@ -24,8 +24,22 @@ jobs:
       - name: validate
         run: tofu validate
 
+      # `mock_provider` needs OpenTofu/Terraform >= 1.7 and runs with no cloud
+      # credentials and no network.
+      - name: test
+        run: tofu test
+
       - name: validate example
         working-directory: examples/basic
         run: |
           tofu init -backend=false
           tofu validate
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: tflint
+        run: |
+          tflint --init
+          tflint --recursive
