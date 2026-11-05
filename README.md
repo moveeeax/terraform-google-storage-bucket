@@ -13,7 +13,7 @@ public access prevention is `enforced`, and `force_destroy` is off.
 
 ```hcl
 module "bucket" {
-  source = "github.com/moveeeax/terraform-google-storage-bucket"
+  source = "github.com/moveeeax/terraform-google-storage-bucket?ref=v1.0.0"
 
   project_id         = var.project_id
   name               = "my-app-assets"
