@@ -30,4 +30,37 @@ resource "google_storage_bucket" "this" {
       }
     }
   }
+
+  dynamic "lifecycle_rule" {
+    for_each = var.abort_incomplete_multipart_days == null ? [] : [var.abort_incomplete_multipart_days]
+    content {
+      action {
+        type = "AbortIncompleteMultipartUpload"
+      }
+      condition {
+        age = lifecycle_rule.value
+      }
+    }
+  }
+
+  # Rendered after the two shortcut rules above so callers that only use the
+  # shortcuts keep the same rule order in their plans.
+  dynamic "lifecycle_rule" {
+    for_each = var.lifecycle_rules
+    content {
+      action {
+        type          = lifecycle_rule.value.action.type
+        storage_class = lifecycle_rule.value.action.storage_class
+      }
+      condition {
+        age                        = lifecycle_rule.value.condition.age
+        num_newer_versions         = lifecycle_rule.value.condition.num_newer_versions
+        days_since_noncurrent_time = lifecycle_rule.value.condition.days_since_noncurrent_time
+        with_state                 = lifecycle_rule.value.condition.with_state
+        matches_prefix             = lifecycle_rule.value.condition.matches_prefix
+        matches_suffix             = lifecycle_rule.value.condition.matches_suffix
+        matches_storage_class      = lifecycle_rule.value.condition.matches_storage_class
+      }
+    }
+  }
 }
