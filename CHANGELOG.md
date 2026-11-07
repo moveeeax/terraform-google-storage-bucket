@@ -6,6 +6,8 @@ All notable changes to this module are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-07
+
 ### Added
 
 - `lifecycle_rules` input: a list of lifecycle rules with `Delete`,
@@ -23,4 +25,5 @@ All notable changes to this module are documented here. The format follows
   `allAuthenticatedUsers` in `iam_members` fail the plan unless it is `true`
   and `public_access_prevention` is `"inherited"`.
 
-[Unreleased]: https://github.com/moveeeax/terraform-google-storage-bucket/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/moveeeax/terraform-google-storage-bucket/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/moveeeax/terraform-google-storage-bucket/compare/v1.1.0...v1.2.0
