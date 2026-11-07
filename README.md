@@ -49,6 +49,22 @@ module "bucket" {
 }
 ```
 
+Bucket-level IAM is granted with `iam_members`, a map of role to members:
+
+```hcl
+module "bucket" {
+  source = "github.com/moveeeax/terraform-google-storage-bucket?ref=v1.0.0"
+
+  project_id = var.project_id
+  name       = "my-app-assets"
+
+  iam_members = {
+    "roles/storage.objectViewer"  = ["serviceAccount:app@my-project.iam.gserviceaccount.com"]
+    "roles/storage.objectCreator" = ["serviceAccount:uploader@my-project.iam.gserviceaccount.com"]
+  }
+}
+```
+
 A runnable example lives in [`examples/basic`](examples/basic).
 
 ## Requirements
@@ -75,6 +91,8 @@ A runnable example lives in [`examples/basic`](examples/basic).
 | `abort_incomplete_multipart_days` | Abort incomplete multipart uploads older than this many days (whole number, `>= 1`). | `number` | `null` | no |
 | `lifecycle_rules`             | Additional lifecycle rules, see below.                   | `list(object)` | `[]`        |    no    |
 | `labels`                      | Labels applied to the bucket.                            | `map(string)` | `{}`         |    no    |
+| `iam_members`                 | Bucket IAM grants as role -> list of members.            | `map(list(string))` | `{}`   |    no    |
+| `allow_public`                | Allow `allUsers` / `allAuthenticatedUsers` in `iam_members`. | `bool`    | `false`      |    no    |
 
 ### Notes
 
@@ -98,6 +116,11 @@ A runnable example lives in [`examples/basic`](examples/basic).
   matches every object. `age` must be `>= 1` and `num_newer_versions` `>= 1`
   for the same reason. The rules from `lifecycle_age_days` and
   `abort_incomplete_multipart_days` are rendered first, then this list in order.
+- **`iam_members`** creates one `google_storage_bucket_iam_member` per role and
+  member, so it adds grants without taking over the bucket's whole policy;
+  grants made elsewhere stay in place. `allUsers` and `allAuthenticatedUsers`
+  fail the plan unless `allow_public = true` and
+  `public_access_prevention = "inherited"` are both set.
 - **`kms_key_name`** requires the bucket's service agent to already hold
   `roles/cloudkms.cryptoKeyEncrypterDecrypter` on the key, otherwise bucket
   creation fails. Use `depends_on` on the IAM binding when creating both.

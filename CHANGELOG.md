@@ -17,5 +17,10 @@ All notable changes to this module are documented here. The format follows
   shortcut.
 - `abort_incomplete_multipart_days` input: aborts incomplete multipart uploads
   older than the given number of days.
+- `iam_members` input: bucket-level IAM grants as a map of role to members,
+  one `google_storage_bucket_iam_member` per pair.
+- `allow_public` input (default `false`): `allUsers` and
+  `allAuthenticatedUsers` in `iam_members` fail the plan unless it is `true`
+  and `public_access_prevention` is `"inherited"`.
 
 [Unreleased]: https://github.com/moveeeax/terraform-google-storage-bucket/compare/v1.1.0...HEAD
