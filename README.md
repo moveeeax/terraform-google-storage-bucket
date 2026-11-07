@@ -2,8 +2,9 @@
 
 Terraform module that manages a [Google Cloud](https://cloud.google.com/)
 Cloud Storage bucket (`google_storage_bucket`). It creates a single bucket with
-uniform bucket-level access, optional versioning and an optional age-based
-lifecycle rule.
+uniform bucket-level access, optional versioning and optional lifecycle rules
+(delete, storage-class tiering, noncurrent-version cleanup and aborting
+incomplete multipart uploads).
 
 Defaults are chosen to be safe rather than permissive: uniform bucket-level
 access is on (so legacy per-object ACLs are not a path to public exposure),
@@ -20,6 +21,31 @@ module "bucket" {
   location           = "US"
   versioning_enabled = true
   lifecycle_age_days = 90
+}
+```
+
+Tiering and noncurrent-version cleanup go in `lifecycle_rules`:
+
+```hcl
+module "bucket" {
+  source = "github.com/moveeeax/terraform-google-storage-bucket?ref=v1.0.0"
+
+  project_id         = var.project_id
+  name               = "my-app-backups"
+  versioning_enabled = true
+
+  abort_incomplete_multipart_days = 7
+
+  lifecycle_rules = [
+    {
+      action    = { type = "SetStorageClass", storage_class = "COLDLINE" }
+      condition = { age = 30, matches_storage_class = ["STANDARD"] }
+    },
+    {
+      action    = { type = "Delete" }
+      condition = { days_since_noncurrent_time = 30 }
+    },
+  ]
 }
 ```
 
@@ -46,6 +72,8 @@ A runnable example lives in [`examples/basic`](examples/basic).
 | `versioning_enabled`          | Whether to enable object versioning.                     | `bool`        | `false`      |    no    |
 | `force_destroy`               | Whether to delete all objects on destroy.                | `bool`        | `false`      |    no    |
 | `lifecycle_age_days`          | Delete objects older than this many days (whole number, `>= 1`). | `number` | `null`   |    no    |
+| `abort_incomplete_multipart_days` | Abort incomplete multipart uploads older than this many days (whole number, `>= 1`). | `number` | `null` | no |
+| `lifecycle_rules`             | Additional lifecycle rules, see below.                   | `list(object)` | `[]`        |    no    |
 | `labels`                      | Labels applied to the bucket.                            | `map(string)` | `{}`         |    no    |
 
 ### Notes
@@ -59,6 +87,17 @@ A runnable example lives in [`examples/basic`](examples/basic).
   matches every object in the bucket. On a versioned bucket the delete first
   archives the live object; the noncurrent version is removed once it also
   exceeds the age.
+- **`lifecycle_rules`** takes a list of `{ action, condition }` objects that
+  map one to one onto `lifecycle_rule` blocks. `action.type` is `Delete`,
+  `SetStorageClass` (with `action.storage_class` set to `STANDARD`, `NEARLINE`,
+  `COLDLINE` or `ARCHIVE`) or `AbortIncompleteMultipartUpload`. The supported
+  condition fields are `age`, `num_newer_versions`,
+  `days_since_noncurrent_time`, `with_state` (`LIVE`, `ARCHIVED` or `ANY`),
+  `matches_prefix`, `matches_suffix` and `matches_storage_class`; all are
+  optional, but each rule must set at least one, because an empty condition
+  matches every object. `age` must be `>= 1` and `num_newer_versions` `>= 1`
+  for the same reason. The rules from `lifecycle_age_days` and
+  `abort_incomplete_multipart_days` are rendered first, then this list in order.
 - **`kms_key_name`** requires the bucket's service agent to already hold
   `roles/cloudkms.cryptoKeyEncrypterDecrypter` on the key, otherwise bucket
   creation fails. Use `depends_on` on the IAM binding when creating both.

@@ -22,6 +22,16 @@ module "bucket" {
   location           = "US"
   versioning_enabled = true
 
+  # Keep the three newest noncurrent versions of each object and abort
+  # multipart uploads that never finished.
+  abort_incomplete_multipart_days = 7
+  lifecycle_rules = [
+    {
+      action    = { type = "Delete" }
+      condition = { num_newer_versions = 3, with_state = "ARCHIVED" }
+    },
+  ]
+
   labels = {
     environment = "sandbox"
   }

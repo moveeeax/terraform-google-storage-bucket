@@ -83,6 +83,86 @@ variable "lifecycle_age_days" {
   }
 }
 
+variable "lifecycle_rules" {
+  description = <<-EOT
+    Additional lifecycle rules, applied after the lifecycle_age_days and
+    abort_incomplete_multipart_days shortcuts. action.type is Delete,
+    SetStorageClass (requires action.storage_class) or AbortIncompleteMultipartUpload.
+    Every condition field is optional, but each rule must set at least one.
+  EOT
+  type = list(object({
+    action = object({
+      type          = string
+      storage_class = optional(string)
+    })
+    condition = object({
+      age                        = optional(number)
+      num_newer_versions         = optional(number)
+      days_since_noncurrent_time = optional(number)
+      with_state                 = optional(string)
+      matches_prefix             = optional(list(string))
+      matches_suffix             = optional(list(string))
+      matches_storage_class      = optional(list(string))
+    })
+  }))
+  default = []
+
+  validation {
+    condition     = alltrue([for r in var.lifecycle_rules : contains(["Delete", "SetStorageClass", "AbortIncompleteMultipartUpload"], r.action.type)])
+    error_message = "lifecycle_rules[*].action.type must be Delete, SetStorageClass or AbortIncompleteMultipartUpload."
+  }
+
+  validation {
+    condition = alltrue([
+      for r in var.lifecycle_rules : r.action.type == "SetStorageClass"
+      ? try(contains(["STANDARD", "NEARLINE", "COLDLINE", "ARCHIVE"], r.action.storage_class), false)
+      : r.action.storage_class == null
+    ])
+    error_message = "lifecycle_rules[*].action.storage_class is required for SetStorageClass (STANDARD, NEARLINE, COLDLINE or ARCHIVE) and must be null for other action types."
+  }
+
+  validation {
+    # An empty condition matches every object, so a Delete rule without one
+    # would wipe the bucket on the next lifecycle sweep.
+    condition     = alltrue([for r in var.lifecycle_rules : anytrue([for v in values(r.condition) : v != null])])
+    error_message = "Each lifecycle_rules entry must set at least one condition field; an empty condition matches every object."
+  }
+
+  validation {
+    # Same reasoning as lifecycle_age_days: age = 0 matches every object.
+    condition = alltrue([
+      for r in var.lifecycle_rules : r.condition.age == null || try(r.condition.age >= 1 && floor(r.condition.age) == r.condition.age, false)
+    ])
+    error_message = "lifecycle_rules[*].condition.age must be null or a whole number of days >= 1."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for r in var.lifecycle_rules : [
+        r.condition.num_newer_versions == null || try(r.condition.num_newer_versions >= 1 && floor(r.condition.num_newer_versions) == r.condition.num_newer_versions, false),
+        r.condition.days_since_noncurrent_time == null || try(r.condition.days_since_noncurrent_time >= 0 && floor(r.condition.days_since_noncurrent_time) == r.condition.days_since_noncurrent_time, false),
+      ]
+    ]))
+    error_message = "lifecycle_rules[*].condition.num_newer_versions must be a whole number >= 1 and days_since_noncurrent_time a whole number >= 0."
+  }
+
+  validation {
+    condition     = alltrue([for r in var.lifecycle_rules : r.condition.with_state == null || contains(["LIVE", "ARCHIVED", "ANY"], coalesce(r.condition.with_state, "-"))])
+    error_message = "lifecycle_rules[*].condition.with_state must be LIVE, ARCHIVED or ANY."
+  }
+}
+
+variable "abort_incomplete_multipart_days" {
+  description = "Abort incomplete multipart uploads older than this many days. Null disables the rule."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.abort_incomplete_multipart_days == null || try(var.abort_incomplete_multipart_days >= 1 && floor(var.abort_incomplete_multipart_days) == var.abort_incomplete_multipart_days, false)
+    error_message = "abort_incomplete_multipart_days must be null or a whole number of days >= 1."
+  }
+}
+
 variable "labels" {
   description = "Labels applied to the bucket."
   type        = map(string)
