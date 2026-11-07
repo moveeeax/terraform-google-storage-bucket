@@ -1,3 +1,16 @@
+locals {
+  public_principals = ["allUsers", "allAuthenticatedUsers"]
+
+  # role -> [members] flattened to one entry per binding, keyed "<role> <member>".
+  iam_members = {
+    for binding in flatten([
+      for role, members in var.iam_members : [
+        for member in distinct(members) : { role = role, member = member }
+      ]
+    ]) : "${binding.role} ${binding.member}" => binding
+  }
+}
+
 resource "google_storage_bucket" "this" {
   project                     = var.project_id
   name                        = var.name
@@ -61,6 +74,24 @@ resource "google_storage_bucket" "this" {
         matches_suffix             = lifecycle_rule.value.condition.matches_suffix
         matches_storage_class      = lifecycle_rule.value.condition.matches_storage_class
       }
+    }
+  }
+}
+
+resource "google_storage_bucket_iam_member" "this" {
+  for_each = local.iam_members
+
+  bucket = google_storage_bucket.this.name
+  role   = each.value.role
+  member = each.value.member
+
+  lifecycle {
+    precondition {
+      # Public principals need two explicit opt-ins: allow_public here, and
+      # public_access_prevention = "inherited" on the bucket, since "enforced"
+      # makes the API reject the grant anyway.
+      condition     = !contains(local.public_principals, each.value.member) || (var.allow_public && var.public_access_prevention == "inherited")
+      error_message = "${each.value.member} makes the bucket public. Set allow_public = true and public_access_prevention = \"inherited\" if that is intended."
     }
   }
 }

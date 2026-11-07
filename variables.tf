@@ -168,3 +168,35 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "iam_members" {
+  description = <<-EOT
+    Bucket-level IAM grants as a map of role to member list, e.g.
+    { "roles/storage.objectViewer" = ["serviceAccount:app@p.iam.gserviceaccount.com"] }.
+    Each pair becomes a google_storage_bucket_iam_member, so roles granted outside
+    this module are left alone. allUsers and allAuthenticatedUsers are rejected
+    unless allow_public is true.
+  EOT
+  type        = map(list(string))
+  default     = {}
+
+  validation {
+    condition     = alltrue([for role in keys(var.iam_members) : can(regex("^(roles/|projects/[^/]+/roles/|organizations/[^/]+/roles/)", role))])
+    error_message = "iam_members keys must be role names such as roles/storage.objectViewer or a custom role projects/<p>/roles/<r>."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for members in values(var.iam_members) : [for m in members : trimspace(m) != ""]]))
+    error_message = "iam_members must not contain empty member strings."
+  }
+}
+
+variable "allow_public" {
+  description = <<-EOT
+    Allow allUsers or allAuthenticatedUsers in iam_members. Also requires
+    public_access_prevention = "inherited". Leave false unless the bucket is
+    deliberately public.
+  EOT
+  type        = bool
+  default     = false
+}
